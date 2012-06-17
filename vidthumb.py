@@ -1,4 +1,22 @@
 #!/usr/bin/env python
+'''
+Copyright 2012 Petr Pudlak
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+'''
+
 import argparse
 import tempfile
 import subprocess
@@ -8,6 +26,8 @@ import re
 import math
 import contextlib
 import shutil
+# PIL
+import Image
 
 def ratio_parser(expression):
     (u, v) = re.match(r'^(\d*\.?\d+)(/(\d*\.?\d+))?$', expression).group(1, 3)
@@ -42,11 +62,12 @@ if os.path.exists(args.output) and not args.force:
     print "The output file {0} already exists.".format(args.output)
     sys.exit(2)
 
-twidth = args.width / args.x - 4
-theight = ''
+border = 1
+twidth = args.width / args.x
+theight = None
 if args.aspect:
     theight = twidth * args.aspect
-n = args.x * args.y + 1
+n = args.x * args.y
 
 @contextlib.contextmanager
 def tempdir():
@@ -57,20 +78,22 @@ def tempdir():
         shutil.rmtree(tdir)
 
 sys.stdout.flush()
-ofiles = []
 if args.debug:
     ffout = None # print everything to stdout
 else:
     ffout = open(os.path.devnull, 'w')
 
+def ofile_name(i):
+    return os.path.join(tdir, '%03d.png' % i)
+
 with tempdir() as tdir:
-    for i in range(1, n):
-        (part, fileno) = math.modf(float(i) * len(args.input) / n)
+    # Create video thumbnails as separate image files.
+    for i in range(0, n):
+        (part, fileno) = math.modf(float(i + 1) * len(args.input) / (n + 1))
         ifile = args.input[int(fileno)]
-        ofile = os.path.join(tdir, '%03d.png' % i)
+        ofile = ofile_name(i)
         percent = max(0, min(99, 100 * part + args.offset))
         print "{0} <- {1} {2}%".format(ofile, ifile, int(percent))
-        ofiles.append(ofile)
         if subprocess.call(
               [ 'ffmpegthumbnailer'
               , '-i{0}'.format(ifile)
@@ -83,15 +106,18 @@ with tempdir() as tdir:
     if ffout:
         ffout.close()
 
-    subprocess.call(
-        [ 'gm'
-        , 'montage'
-        , '-interlace', 'Line'
-        , '-background', 'gray'
-        , '+label'
-        , '-borderwidth', '1x1'
-        , '-geometry', "{0}x{1}".format(twidth, theight)
-        , '-tile', "{0}x{1}".format(args.x, args.y)
-        ] + ofiles
-          + [ args.output ])
+    # Read the image files and combine them into one big image.
+    im = Image.open(ofile_name(0))
+    if not theight:
+        # Open the first image to get its size
+        (iw, ih) = im.size
+        theight = twidth * ih / iw
+    big = Image.new("RGB", (args.width, theight * args.y), (0x80, 0x80, 0x80))
+    for i in range(0, n):
+        (iy, ix) = divmod(i, args.x)
+        ofile = ofile_name(i)
+        im = Image.open(ofile)
+        im.thumbnail((twidth - 2*border, theight - 2*border), Image.ANTIALIAS)
+        big.paste(im, (twidth * ix + border, theight * iy + border))
+    big.save(args.output)
 print "Written {0}".format(args.output)

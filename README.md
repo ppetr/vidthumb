@@ -4,9 +4,10 @@ Creates an image composed of thumbnails of given video file(s). The thumbnails s
 
 Requirements
 ------------
- - Python,
- - *ffmpegthumbnailer* in the system path,
- - *gm* from the [GraphicsMagick](http://www.graphicsmagick.org/) package in the system path.
+ - Python 2.4 or later,
+ - Python *argparser* library,
+ - Python Imaging Library,
+ - *ffmpegthumbnailer* in the system path.
 
 Caveats
 -------
