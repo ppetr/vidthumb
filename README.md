@@ -4,7 +4,7 @@ Creates an image composed of thumbnails of given video file(s). The thumbnails s
 
 Requirements
 ------------
- - Python 2.4 or later,
+ - Python 2.6 or later,
  - Python *argparser* library,
  - Python Imaging Library,
  - *ffmpegthumbnailer* in the system path.
