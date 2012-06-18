@@ -26,6 +26,7 @@ import re
 import math
 import contextlib
 import shutil
+from multiprocessing import Pool
 # PIL
 import Image
 
@@ -56,6 +57,8 @@ parser.add_argument('-d', '--debug', dest='debug', default=False, action='store_
         help='debugging on - print ffmpegthumbnailer output (use when ffmpegthumbnailer fails)')
 parser.add_argument('--offset', dest='offset', type=int, default=0,
         help='shift the thumbnails positions by this amount of %%')
+parser.add_argument('-p', '--processes', dest='processes', type=int,
+        help='the number of ffmpegthumbnailer processes to run simultaneously')
 args = parser.parse_args()
 
 if os.path.exists(args.output) and not args.force:
@@ -77,7 +80,6 @@ def tempdir():
     finally:
         shutil.rmtree(tdir)
 
-sys.stdout.flush()
 if args.debug:
     ffout = None # print everything to stdout
 else:
@@ -86,23 +88,33 @@ else:
 def ofile_name(i):
     return os.path.join(tdir, '%03d.png' % i)
 
+def mkthumb(i):
+    (part, fileno) = math.modf(float(i + 1) * len(args.input) / (n + 1))
+    ifile = args.input[int(fileno)]
+    ofile = ofile_name(i)
+    percent = max(0, min(99, 100 * part + args.offset))
+    print "{0} <- {1} {2}%".format(ofile, ifile, int(percent))
+    if subprocess.call(
+          [ 'ffmpegthumbnailer'
+          , '-i{0}'.format(ifile)
+          , '-t{0}%'.format(percent)
+          , '-o{0}'.format(ofile)
+          , '-s0'
+          ], stdout = ffout, stderr = subprocess.STDOUT ):
+        print "Failed to execute ffmpegthumbnailer."
+        sys.exit(1)
+
 with tempdir() as tdir:
     # Create video thumbnails as separate image files.
-    for i in range(0, n):
-        (part, fileno) = math.modf(float(i + 1) * len(args.input) / (n + 1))
-        ifile = args.input[int(fileno)]
-        ofile = ofile_name(i)
-        percent = max(0, min(99, 100 * part + args.offset))
-        print "{0} <- {1} {2}%".format(ofile, ifile, int(percent))
-        if subprocess.call(
-              [ 'ffmpegthumbnailer'
-              , '-i{0}'.format(ifile)
-              , '-t{0}%'.format(percent)
-              , '-o{0}'.format(ofile)
-              , '-s0'
-              ], stdout = ffout, stderr = subprocess.STDOUT ):
-            print "Failed to execute ffmpegthumbnailer."
-            sys.exit(1)
+    if args.processes:
+        pool = Pool(processes=args.processes)
+        for i in range(0, n):
+            pool.apply_async(mkthumb, (i, ))
+        pool.close()
+        pool.join()
+    else:
+        for i in range(0, n):
+            mkthumb(i)
     if ffout:
         ffout.close()
 
