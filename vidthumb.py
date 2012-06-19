@@ -62,7 +62,7 @@ parser.add_argument('-p', '--processes', dest='processes', type=int,
 args = parser.parse_args()
 
 if os.path.exists(args.output) and not args.force:
-    print "The output file {0} already exists.".format(args.output)
+    print("The output file {0} already exists.".format(args.output))
     sys.exit(2)
 
 border = 1
@@ -93,7 +93,7 @@ def mkthumb(i):
     ifile = args.input[int(fileno)]
     ofile = ofile_name(i)
     percent = max(0, min(99, 100 * part + args.offset))
-    print "{0} <- {1} {2}%".format(ofile, ifile, int(percent))
+    print("{0} <- {1} {2}%".format(ofile, ifile, int(percent)))
     if subprocess.call(
           [ 'ffmpegthumbnailer'
           , '-i{0}'.format(ifile)
@@ -101,7 +101,7 @@ def mkthumb(i):
           , '-o{0}'.format(ofile)
           , '-s0'
           ], stdout = ffout, stderr = subprocess.STDOUT ):
-        print "Failed to execute ffmpegthumbnailer."
+        print("Failed to execute ffmpegthumbnailer.")
         sys.exit(1)
 
 with tempdir() as tdir:
@@ -132,4 +132,4 @@ with tempdir() as tdir:
         im.thumbnail((twidth - 2*border, theight - 2*border), Image.ANTIALIAS)
         big.paste(im, (twidth * ix + border, theight * iy + border))
     big.save(args.output)
-print "Written {0}".format(args.output)
+print("Written {0}".format(args.output))
